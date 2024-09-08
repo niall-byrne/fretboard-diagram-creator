@@ -211,9 +211,11 @@ class Fretboard {
     }
 
     updateColor(event) {
-        this.updateNote(this.state.selected, {
-            color: event.currentTarget.getAttribute("title"),
-        });
+        if (this.state.selected) {
+            this.updateNote(this.state.selected, {
+                color: event.currentTarget.getAttribute("title"),
+            });
+        }
     }
 
     drawFrets() {

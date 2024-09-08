@@ -498,7 +498,7 @@ class Fretboard {
         div.setAttribute("id", "editable-div");
         div.addEventListener("keydown", (event) => {
             event.stopPropagation();
-            if (event.code === "Enter") {
+            if (event.key === "Enter") {
                 event.target.blur();
             }
         });

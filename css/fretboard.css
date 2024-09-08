@@ -15,7 +15,15 @@
     --dark_gray_colour: #4A4A4A;
     --gray_color: #9B9B9B;
     --white_colour: #ffffff;
+    background-color: #CFCFCF;
 }
+
+
+figure.half-full {
+    max-width: 100vw;
+    overflow-x: auto;
+}
+
 
 g.fretMarkers {
     opacity: 50%;
@@ -221,6 +229,15 @@ div.menu {
     /* text-align: center; */
 }
 
+.container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
 text.marker {
     text-anchor: middle;
     font-size: 16px;
@@ -315,7 +332,6 @@ button.color:hover {
 
 
 
-
 /* Global actions */
 
 .global-actions {
@@ -325,45 +341,11 @@ button.color:hover {
     justify-content: space-between;
 }
 
-@supports (width: 100vw) {
-    figure.half-full {
-        max-width: 100vw;
-        width: 1200px;
-        position: relative;
-        left: 50%;
-        right: 50%;
-        margin-left: -600px;
-        margin-right: -600px;
-    }
-    @media only screen and (max-width: 1200px) {
-        figure.half-full {
-            max-width: 100vw;
-            width: 1000px;
-            position: relative;
-            left: 50%;
-            right: 50%;
-            margin-left: -500px;
-            margin-right: -500px;
-            overflow-y: auto;
-        }
-    }
-    @media only screen and (max-width: 1000px) {
-        figure.half-full {
-            max-width: 100vw;
-            width: 100%;
-            left: 0;
-            right: 0;
-            margin: 0;
-            overflow-y: auto;
-        }
-    }
-}
-
 .fret-size-control {
     display: flex;
     align-items: space-between;
     justify-content: space-between;
-    color: var(--gray_color)
+    color: var(--black_colour)
 }
 
 .num-input {

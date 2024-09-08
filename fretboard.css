@@ -207,6 +207,8 @@ g.note>text {
 #editable-div {
     text-align: center;
     font-size: 18px;
+    background-color: var(--black_colour);
+    color: var(--white_colour);
 }
 
 #fretboard-diagram-creator {

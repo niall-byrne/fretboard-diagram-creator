@@ -17,6 +17,11 @@
     --white_colour: #ffffff;
 }
 
+g.fretMarkers {
+    opacity: 50%;
+    fill: var(--gray_color);
+}
+
 g.note.transparent:hover {
     opacity: 1;
 }

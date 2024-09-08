@@ -1,20 +1,37 @@
 /* Diagram */
+:root {
+    --red_colour: #D0021B;
+    --orange_colour: #F5A623;
+    --yellow_colour: #F8E71C;
+    --brown_colour: #8B572A;
+    --light_green_colour: #7ED321;
+    --green_colour: #417505;
+    --pink_colour: #BD10E0;
+    --purple_colour: #9013FE;
+    --blue_colour: #4A90E2;
+    --teal_colour: #50E3C2;
+    --lime_green_colour: #B8E986;
+    --black_colour: #000000;
+    --dark_gray_colour: #4A4A4A;
+    --gray_color: #9B9B9B;
+    --white_colour: #ffffff;
+}
 
 g.note.transparent:hover {
     opacity: 1;
 }
 
 g.note {
-    fill: white;
+    fill: var(--white_colour);
     stroke-width: 1px;
-    stroke: black;
+    stroke: var(--black_colour);
 }
 
 g.note.selected>circle {
     opacity: 1;
     stroke-dasharray: 4, 4;
     stroke-width: 3px;
-    stroke: black;
+    stroke: var(--black_colour);
 }
 
 g.note.hidden {
@@ -27,60 +44,151 @@ g.note.transparent {
 
 g.note.visible {
     opacity: 1;
-    fill: white;
-}
-
-g.note.blue {
-    fill: steelblue;
-}
-
-g.note.blue>text {
-    stroke: white;
-    fill: white;
-}
-
-g.note.black {
-    fill: black;
-}
-
-g.note.black>text {
-    stroke: white;
-    fill: white;
+    fill: var(--white_colour);
 }
 
 g.note.red {
-    fill: indianred;
+    fill: var(--red_colour);
 }
 
 g.note.red>text {
-    stroke: white;
-    fill: white;
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
+}
+
+g.note.orange {
+    fill: var(--orange_colour);
+}
+
+g.note.orange>text {
+    stroke: var(--black_colour);
+    fill: var(--black_colour);
+}
+
+g.note.yellow {
+    fill: var(--yellow_colour);
+}
+
+g.note.yellow>text {
+    stroke: var(--black_colour);
+    fill: var(--black_colour);
+}
+
+g.note.brown {
+    fill: var(--brown_colour);
+}
+
+g.note.brown>text {
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
+}
+
+g.note.light_green {
+    fill: var(--light_green_colour);
+}
+
+g.note.light_green>text {
+    stroke: var(--black_colour);
+    fill: var(--black_colour);
 }
 
 g.note.green {
-    fill: teal;
+    fill: var(--green_colour);
 }
 
 g.note.green>text {
-    stroke: white;
-    fill: white;
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
 }
 
+g.note.pink {
+    fill: var(--pink_colour);
+}
+
+g.note.pink>text {
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
+}
+
+g.note.purple {
+    fill: var(--purple_colour);
+}
+
+g.note.purple>text {
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
+}
+
+g.note.blue {
+    fill: var(--blue_colour);
+}
+
+g.note.blue>text {
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
+}
+
+g.note.teal {
+    fill: var(--teal_colour);
+}
+
+g.note.teal>text {
+    stroke: var(--black_colour);
+    fill: var(--black_colour);
+}
+
+g.note.lime_green {
+    fill: var(--lime_green_colour);
+}
+
+g.note.lime_green>text {
+    stroke: var(--black_colour);
+    fill: var(--black_colour);
+}
+
+g.note.black {
+    fill: var(--black_colour);
+}
+
+g.note.black>text {
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
+}
+
+g.note.dark_gray {
+    fill: var(--dark_gray_colour);
+}
+
+g.note.dark_gray>text {
+    stroke: var(--white_colour);
+    fill: var(--white_colour);
+}
+
+g.note.gray {
+    fill: var(--gray_color);
+}
+
+g.note.gray>text {
+    stroke: var(--black_colour);
+    fill: var(--black_colour);
+}
+
+
 path.string {
-    stroke: black;
+    stroke: var(--black_colour);
     fill: none;
 }
 
 path.frets {
-    stroke: black;
+    stroke: var(--black_colour);
     stroke-width: 1px;
     fill: none;
 }
 
 g.note>text {
-    stroke: black;
+    stroke: var(--black_colour);
     stroke-width: 0px;
-    fill: black;
+    fill: var(--black_colour);
     text-anchor: middle;
     dominant-baseline: middle;
     font-size: 18px;
@@ -104,7 +212,7 @@ div.menu {
 text.marker {
     text-anchor: middle;
     font-size: 16px;
-    fill: black;
+    fill: var(--black_colour);
 }
 
 
@@ -133,25 +241,68 @@ button.color:hover {
     transform: scale(1.1);
 }
 
-.color.blue {
-    background-color: steelblue;
+.color.red {
+    background-color: var(--red_colour);
 }
 
-.color.black {
-    background-color: black;
+.color.orange {
+    background-color: var(--orange_colour);
+}
+
+.color.yellow {
+    background-color: var(--yellow_colour)
+}
+
+.color.brown {
+    background-color: var(--brown_colour)
+}
+
+.color.light_green {
+    background-color: var(--light_green_colour)
 }
 
 .color.green {
-    background-color: teal;
+    background-color: var(--green_colour);
 }
 
-.color.red {
-    background-color: indianred;
+.color.pink {
+    background-color: var(--pink_colour);
+}
+
+.color.purple {
+    background-color: var(--purple_colour);
+}
+
+.color.blue {
+    background-color: var(--blue_colour);
+}
+
+.color.teal {
+    background-color: var(--teal_colour);
+}
+
+.color.lime_green {
+    background-color: var(--lime_green_colour);
+}
+
+.color.black {
+    background-color: var(--black_colour);
+}
+
+.color.dark_gray {
+    background-color: var(--dark_gray_colour);
+}
+
+.color.gray {
+    background-color: var(--gray_color);
 }
 
 .color.white {
-    background-color: white;
+    background-color: var(--white_colour);
 }
+
+
+
 
 /* Global actions */
 

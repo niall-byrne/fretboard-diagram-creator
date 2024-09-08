@@ -32,6 +32,10 @@ g.note {
     stroke: var(--black_colour);
 }
 
+g.note:hover {
+    cursor: default;
+}
+
 g.note.selected>circle {
     opacity: 1;
     stroke-dasharray: 4, 4;

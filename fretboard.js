@@ -47,6 +47,7 @@ class Fretboard {
             offsetY: 30,
             stringIntervals: [24, 19, 15, 10, 5, 0],
             markers: [3, 5, 7, 9, 12, 15, 17, 19, 21],
+            doubleMarkers: [12, 24],
             fretWidth: 70,
             stringSpacing: 40,
             minStringSize: 0.2,
@@ -146,6 +147,7 @@ class Fretboard {
         this.drawFrets();
         this.drawMarkers();
         this.drawStrings();
+        this.drawFretMarkers();
         this.drawNotes();
         this.addEditableDiv();
 
@@ -322,6 +324,38 @@ class Fretboard {
         this.updateNote(note, update);
     }
 
+    drawSingleFretMarker(markerId, x, y) {
+        const marker = createSvgElement("g", {
+            id: markerId,
+            transform: "translate(" + x + "," + y + ")",
+            "data-x": x,
+            "data-y": y,
+        });
+        this.fretMarkers.appendChild(marker);
+        const circle = createSvgElement("circle", {
+            r: this.consts.circleRadius / 1.5,
+        });
+        marker.appendChild(circle);
+    }
+
+    drawDoubleFretMarker(markerId, x, y) {
+        for (let i = 0; i < 2; i++) {
+            const adjustedY =
+                y - this.consts.offsetX + i * this.consts.offsetX * 2;
+            const marker = createSvgElement("g", {
+                id: markerId,
+                transform: "translate(" + x + "," + adjustedY + ")",
+                "data-x": x,
+                "data-y": adjustedY,
+            });
+            this.fretMarkers.appendChild(marker);
+            const circle1 = createSvgElement("circle", {
+                r: this.consts.circleRadius / 1.5,
+            });
+            marker.appendChild(circle1);
+        }
+    }
+
     computeNoteName(fret, string) {
         const interval = this.consts.stringIntervals[string] + fret + 1;
         return this.consts.notes[this.state.enharmonic][interval % 12];
@@ -352,6 +386,36 @@ class Fretboard {
                 const y = this.consts.offsetY + this.consts.stringSpacing * j;
                 const noteName = this.computeNoteName(i, j);
                 this.drawNote(noteId, x, y, noteName, false);
+            }
+        }
+    }
+
+    drawFretMarkers() {
+        this.fretMarkers = createSvgElement("g", {
+            class: "fretMarkers",
+        });
+        this.svg.appendChild(this.fretMarkers);
+        for (let i = 0; i < this.consts.markers.length; i++) {
+            const relativeMarkerFretPosition =
+                this.consts.markers[i] - this.state.startFret;
+            if (
+                relativeMarkerFretPosition > 0 &&
+                this.consts.markers[i] <= this.state.endFret
+            ) {
+                const j = this.consts.numStrings / 2 - 0.5;
+                const markerId = `fret-marker-${relativeMarkerFretPosition}`;
+                const x =
+                    this.consts.offsetX +
+                    this.consts.fretWidth / 2 +
+                    this.consts.fretWidth * (relativeMarkerFretPosition - 1);
+                const y = this.consts.offsetY + this.consts.stringSpacing * j;
+                if (
+                    this.consts.doubleMarkers.includes(this.consts.markers[i])
+                ) {
+                    this.drawDoubleFretMarker(markerId, x, y);
+                } else {
+                    this.drawSingleFretMarker(markerId, x, y);
+                }
             }
         }
     }

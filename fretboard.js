@@ -195,8 +195,10 @@ class Fretboard {
     }
 
     deleteNote() {
-        // reset text
         const selected = this.state.selected;
+        if (!selected) {
+            return;
+        }
         const text = selected.lastChild;
         if (text) {
             text.innerHTML = text.getAttribute("data-note");

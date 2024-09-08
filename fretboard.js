@@ -67,6 +67,7 @@ class Fretboard {
             startFret: 0,
             endFret: 12,
             enharmonic: 0,
+            notes: {},
         };
 
         // Set end fret according to viewport width
@@ -84,6 +85,7 @@ class Fretboard {
         this.data = {};
 
         this.draw();
+        this.urlRestore();
     }
 
     computeDependents() {
@@ -441,6 +443,7 @@ class Fretboard {
         if (event.ctrlKey) {
             this.editSelectedLabel();
         }
+        this.urlSave();
     }
 
     noteDoubleClickHandler(event) {
@@ -514,6 +517,7 @@ class Fretboard {
                 this.updateNote(this.state.selected, {
                     noteText: newText,
                 });
+                this.urlSave();
             }
 
             this.editableText.children[0].innerHTML = "";
@@ -547,6 +551,7 @@ class Fretboard {
         for (let [key, value] of Object.entries(update)) {
             noteData[key] = value;
         }
+        this.state.notes[elem.id] = noteData;
     }
 
     toggleVisibility() {
@@ -604,6 +609,60 @@ class Fretboard {
             });
             this.state.selected = null;
         }
+        const url = new URL(location.href);
+        url.searchParams.delete("state");
+        history.replaceState(null, "", url);
+    }
+
+    urlSave() {
+        const savedState = Object.assign({}, this.state);
+        savedState.selected = null;
+        for (let key in this.state.notes) {
+            if (this.state.notes.hasOwnProperty(key)) {
+                const value = this.state.notes[key];
+                // don't save selections
+                if (value.visibility === "selected") {
+                    value.visibility = "visible";
+                }
+                // don't save transparent notes
+                if (value.visibility === "transparent") {
+                    delete this.state.notes[key];
+                }
+            }
+        }
+
+        const param = btoa(JSON.stringify(savedState));
+        const url = new URL(location.href);
+        url.searchParams.set("state", param);
+        history.replaceState(null, "", url);
+    }
+
+    urlRestore() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const state = urlParams.get("state");
+        if (state) {
+            const savedState = JSON.parse(atob(state));
+            this.state = savedState;
+            for (let key in this.state.notes) {
+                if (this.state.notes.hasOwnProperty(key)) {
+                    const note = document.querySelector("#" + key);
+                    if (note) {
+                        this.updateNote(note, this.state.notes[key]);
+                    }
+                }
+            }
+            document.getElementById("enharmonic").innerHTML =
+                this.consts.sign[(this.state.enharmonic + 1) % 2];
+            this.setFretWindow({
+                start: this.state.startFret,
+                end: this.state.endFret,
+            });
+            document.getElementById("start-fret").value =
+                this.state.startFret + 1;
+            document.getElementById("end-fret").value = this.state.endFret;
+            this.erase();
+            this.draw();
+        }
     }
 }
 
@@ -624,6 +683,7 @@ const fretboard = new Fretboard({
 const togglebutton = document.getElementById("visibility");
 togglebutton.addEventListener("click", (event) => {
     fretboard.toggleVisibility();
+    fretboard.urlSave();
 });
 
 /* Save SVG button */
@@ -690,10 +750,12 @@ resetButton.addEventListener("click", (event) => {
 const startFret = document.getElementById("start-fret");
 startFret.addEventListener("input", (event) => {
     fretboard.setFretWindow({ start: event.target.value - 1 });
+    fretboard.urlSave();
 });
 
 endFret.addEventListener("input", (event) => {
     fretboard.setFretWindow({ end: parseInt(event.target.value) });
+    fretboard.urlSave();
 });
 
 /* Color selector */
@@ -702,14 +764,19 @@ const colorButtons = document.querySelectorAll("button.color");
 for (let button of colorButtons) {
     button.addEventListener("click", (event) => {
         fretboard.updateColor(event);
+        fretboard.urlSave();
     });
 }
 
 const deleteNoteButton = document.getElementById("delete-note");
-deleteNoteButton.addEventListener("click", () => fretboard.deleteNote());
+deleteNoteButton.addEventListener("click", () => {
+    fretboard.deleteNote();
+    fretboard.urlSave();
+});
 
 const enharmonicToggle = document.getElementById("enharmonic");
 enharmonicToggle.addEventListener("click", () => {
     const sign = fretboard.toggleEnharmonic();
     enharmonicToggle.innerHTML = sign;
+    fretboard.urlSave();
 });

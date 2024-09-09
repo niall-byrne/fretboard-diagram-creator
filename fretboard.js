@@ -39,9 +39,19 @@ function createSvgElement(tag, attributes = null) {
     return elem;
 }
 
-class Fretboard {
-    constructor(opts) {
-        this.svg = opts.svg;
+class Peristence {
+    // Manages state and persistence of state
+
+    constructor() {
+        this.initial = {
+            selected: null,
+            visibility: "transparent",
+            startFret: 0,
+            endFret: 12,
+            enharmonic: 0,
+            notes: {},
+        };
+
         this.consts = {
             offsetX: 40,
             offsetY: 30,
@@ -57,18 +67,22 @@ class Fretboard {
                     ['E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb']],
             sign: ["♯", "♭"],
         };
+
         this.consts.numStrings = this.consts.stringIntervals.length;
         this.consts.fretHeight =
             (this.consts.numStrings - 1) * this.consts.stringSpacing;
 
-        this.state = {
-            selected: null,
-            visibility: "transparent",
-            startFret: 0,
-            endFret: 12,
-            enharmonic: 0,
-            notes: {},
-        };
+        this.reset();
+    }
+
+    clear() {
+        const url = new URL(location.href);
+        url.searchParams.delete("state");
+        history.replaceState(null, "", url);
+    }
+
+    reset() {
+        this.state = Object.assign({}, this.initial);
 
         // Set end fret according to viewport width
         this.state.endFret = Math.min(
@@ -78,100 +92,288 @@ class Fretboard {
             ),
             12
         );
-        opts.endFret.value = this.state.endFret;
-
-        this.computeDependents();
-
-        this.data = {};
-
-        this.draw();
-        this.urlRestore();
     }
 
-    computeDependents() {
-        this.state.numFrets = this.state.endFret - this.state.startFret;
-        this.state.fretboardWidth = this.consts.fretWidth * this.state.numFrets;
+    restore(fretboard) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const state = urlParams.get("state");
+        if (state) {
+            const savedState = JSON.parse(atob(state));
+            this.state = savedState;
+            for (let key in this.state.notes) {
+                if (this.state.notes.hasOwnProperty(key)) {
+                    const note = document.querySelector("#" + key);
+                    if (note) {
+                        fretboard.updateNote(note, this.state.notes[key]);
+                    }
+                }
+            }
+            fretboard.erase();
+            fretboard.draw();
+        }
+    }
+
+    save() {
+        const savedState = Object.assign({}, this.state);
+        savedState.selected = null;
+        for (let key in this.state.notes) {
+            if (this.state.notes.hasOwnProperty(key)) {
+                const value = this.state.notes[key];
+                // don't save selections
+                if (value.visibility === "selected") {
+                    value.visibility = "visible";
+                }
+                // don't save transparent notes
+                if (value.visibility === "transparent") {
+                    delete this.state.notes[key];
+                }
+            }
+        }
+
+        const param = btoa(JSON.stringify(savedState));
+        const url = new URL(location.href);
+        url.searchParams.set("state", param);
+        history.replaceState(null, "", url);
+    }
+}
+
+class Controls {
+    // Exposes controls directly to the web application
+
+    constructor(opts) {
+        this.persistence = opts.persistence;
+        this.fretboard = opts.fretboard;
+
+        this.controllers = {
+            colourControls: document.querySelectorAll("button.color"),
+            deleteControl: document.getElementById("delete-note"),
+            enharmonicControl: document.getElementById("enharmonic"),
+            fretEndControl: document.getElementById("end-fret"),
+            fretStartControl: document.getElementById("start-fret"),
+            resetControl: document.getElementById("reset"),
+            visibilityToggleControl: document.getElementById("visibility"),
+        };
+    }
+
+    clearSelection() {
+        const selected = this.persistence.state.selected;
+        if (!selected) {
+            return;
+        }
+        fretboard.updateNote(selected, {
+            visibility: "visible",
+        });
+        this.persistence.state.selected = null;
+    }
+
+    deleteNote() {
+        const selected = this.persistence.state.selected;
+        if (!selected) {
+            return;
+        }
+        const text = selected.lastChild;
+        if (text) {
+            text.innerHTML = text.getAttribute("data-note");
+        }
+        this.fretboard.updateNote(selected, {
+            color: "white",
+            visibility: this.persistence.state.visibility,
+        });
+        this.persistence.state.selected = null;
+        this.persistence.save();
     }
 
     toggleEnharmonic() {
-        const untoggledEnharmonic = this.state.enharmonic;
-        this.state.enharmonic = (untoggledEnharmonic + 1) % 2;
-        this.erase();
-        this.draw();
-        return this.consts.sign[untoggledEnharmonic];
+        const untoggledEnharmonic = this.persistence.state.enharmonic;
+        this.persistence.state.enharmonic = (untoggledEnharmonic + 1) % 2;
+        this.updateEnharmonic();
+        this.controllers.enharmonicControl.innerHTML =
+            this.persistence.consts.sign[untoggledEnharmonic];
     }
 
-    setFretWindow(fretWindow) {
+    toggleVisibility() {
+        this.persistence.state.visibility =
+            this.persistence.state.visibility === "hidden"
+                ? "transparent"
+                : "hidden";
+        this.updateVisibillity();
+    }
+
+    resetDiagram() {
+        this.data = {};
+        for (let note of fretboard.notes.children) {
+            // reset text
+            const text = note.lastChild;
+            if (text) {
+                text.innerHTML = text.getAttribute("data-note");
+            }
+            fretboard.updateNote(note, {
+                type: "note",
+                color: "white",
+                visibility: this.persistence.state.visibility,
+            });
+        }
+        this.clearSelection();
+        this.persistence.clear();
+        this.persistence.reset();
+        this.updateFretWindow();
+        this.updateControllers();
+    }
+
+    updateColor(event) {
+        const selected = this.persistence.state.selected;
+        if (!selected) {
+            return;
+        }
+        this.fretboard.updateNote(selected, {
+            color: event.currentTarget.getAttribute("title"),
+        });
+        this.persistence.save();
+    }
+
+    updateControllers() {
+        this.controllers.fretStartControl.value =
+            this.persistence.state.startFret + 1;
+        this.controllers.fretEndControl.value = this.persistence.state.endFret;
+        this.controllers.enharmonicControl.innerHTML =
+            this.persistence.consts.sign[
+                (this.persistence.state.enharmonic + 1) % 2
+            ];
+    }
+
+    updateEnharmonic() {
+        this.fretboard.erase();
+        this.fretboard.draw();
+        this.persistence.save();
+    }
+
+    updateFretWindow(fretWindow) {
         const start =
-            "start" in fretWindow ? fretWindow.start : this.state.startFret;
-        const end = "end" in fretWindow ? fretWindow.end : this.state.endFret;
-        this.erase();
+            fretWindow && "start" in fretWindow
+                ? fretWindow.start
+                : this.persistence.state.startFret;
+        const end =
+            fretWindow && "end" in fretWindow
+                ? fretWindow.end
+                : this.persistence.state.endFret;
+
+        this.fretboard.erase();
+
         if (start < 0 || start > 22 || end < 1 || end > 22) {
-            this.drawError("Invalid fret value(s)!");
+            fretboard.drawError("Invalid fret value(s)!");
             return;
         }
+
         if (end <= start) {
-            this.drawError("End fret must not be smaller than start fret!");
-            this.state.startFret = start;
-            this.state.endFret = end;
+            fretboard.drawError(
+                "End fret must not be smaller than start fret!"
+            );
+            this.persistence.state.startFret = start;
+            this.persistence.state.endFret = end;
             return;
         }
+
         if (end - start > 16) {
-            this.drawError(
+            fretboard.drawError(
                 "Maximal number of displayable frets is 16, <br/> e.g., 1st to 16th or 4th to 19th!"
             );
-            this.state.startFret = start;
-            this.state.endFret = end;
+            this.persistence.state.startFret = start;
+            this.persistence.state.endFret = end;
             return;
         }
 
-        this.state.startFret = start;
-        this.state.endFret = end;
+        this.persistence.state.startFret = start;
+        this.persistence.state.endFret = end;
 
-        this.computeDependents();
-        this.draw();
+        this.fretboard.computeDependents();
+        this.fretboard.draw();
+        this.persistence.save();
     }
 
-    drawError(message) {
-        const text = createSvgElement("text", {
-            x: 400,
-            y: 140,
-            class: "error",
-        });
-        text.innerHTML = message;
-        this.svg.appendChild(text);
-        setAttributes(this.svg, {
-            width: 800,
-        });
+    updateVisibillity() {
+        for (let note of this.fretboard.notes.children) {
+            if (
+                note.className.baseVal.endsWith("visible") ||
+                note.className.baseVal.endsWith("selected")
+            ) {
+                continue;
+            }
+            this.fretboard.updateNote(note, {
+                visibility: this.persistence.state.visibility,
+            });
+        }
+
+        for (let [_key, value] of Object.entries(this.fretboard.data)) {
+            if (
+                value["visibility"] === "visible" ||
+                value["visibility"] === "selected"
+            ) {
+                continue;
+            }
+            value["visibility"] = this.persistence.state.visibility;
+        }
+        this.persistence.save();
+    }
+}
+
+class Fretboard {
+    // The guitar fretboard
+
+    constructor(opts) {
+        this.svg = opts.svg;
+        this.persistence = opts.persistence;
+
+        this.computeDependents();
+        this.data = {};
+        this.draw();
+
+        this.persistence.restore(this);
+    }
+
+    computeDependents() {
+        this.persistence.state.numFrets =
+            this.persistence.state.endFret - this.persistence.state.startFret;
+        this.persistence.state.fretboardWidth =
+            this.persistence.consts.fretWidth * this.persistence.state.numFrets;
+    }
+
+    computeNoteName(fret, string) {
+        const interval =
+            this.persistence.consts.stringIntervals[string] + fret + 1;
+        return this.persistence.consts.notes[this.persistence.state.enharmonic][
+            interval % 12
+        ];
     }
 
     draw() {
         this.drawFrets();
-        this.drawMarkers();
         this.drawStrings();
         this.drawFretMarkers();
+        this.drawNumericMarkers();
         this.drawNotes();
         this.addEditableDiv();
 
         // adjust diagram width to number of selected frets
         setAttributes(this.svg, {
-            width: this.state.fretboardWidth + 2 * this.consts.offsetX,
+            width:
+                this.persistence.state.fretboardWidth +
+                2 * this.persistence.consts.offsetX,
         });
 
         this.svg.addEventListener("click", () => {
-            if (this.state.selected) {
-                this.updateNote(this.state.selected, {
+            if (this.persistence.state.selected) {
+                this.updateNote(this.persistence.state.selected, {
                     visibility: "visible",
                 });
-                this.state.selected = null;
+                this.persistence.state.selected = null;
             }
         });
 
         document.addEventListener("keydown", (event) => {
-            if (!this.state.selected || !event.code) {
+            if (!this.persistence.state.selected || !event.code) {
                 return;
             }
-            const selected = this.state.selected;
+            const selected = this.persistence.state.selected;
             switch (event.code) {
                 case "Backspace":
                 case "Delete":
@@ -196,38 +398,39 @@ class Fretboard {
         });
     }
 
-    deleteNote() {
-        const selected = this.state.selected;
-        if (!selected) {
-            return;
-        }
-        const text = selected.lastChild;
-        if (text) {
-            text.innerHTML = text.getAttribute("data-note");
-        }
-        this.updateNote(selected, {
-            color: "white",
-            visibility: this.state.visibility,
+    drawError(message) {
+        const text = createSvgElement("text", {
+            x: 400,
+            y: 140,
+            class: "error",
         });
-        this.state.selected = null;
-    }
-
-    updateColor(event) {
-        if (this.state.selected) {
-            this.updateNote(this.state.selected, {
-                color: event.currentTarget.getAttribute("title"),
-            });
-        }
+        text.innerHTML = message;
+        this.svg.appendChild(text);
+        setAttributes(this.svg, {
+            width: 800,
+        });
     }
 
     drawFrets() {
         var pathSegments = [
-            "M " + this.consts.offsetX + " " + this.consts.offsetY,
+            "M " +
+                this.persistence.consts.offsetX +
+                " " +
+                this.persistence.consts.offsetY,
         ];
-        for (let i = this.state.startFret; i < this.state.endFret + 1; i++) {
-            let factor = (i - this.state.startFret) % 2 == 0 ? 1 : -1;
-            pathSegments.push("v " + factor * this.consts.fretHeight);
-            pathSegments.push("m " + this.consts.fretWidth + " " + 0);
+        for (
+            let i = this.persistence.state.startFret;
+            i < this.persistence.state.endFret + 1;
+            i++
+        ) {
+            let factor =
+                (i - this.persistence.state.startFret) % 2 == 0 ? 1 : -1;
+            pathSegments.push(
+                "v " + factor * this.persistence.consts.fretHeight
+            );
+            pathSegments.push(
+                "m " + this.persistence.consts.fretWidth + " " + 0
+            );
         }
         const path = pathSegments.join(" ");
 
@@ -238,24 +441,98 @@ class Fretboard {
         this.svg.appendChild(frets);
     }
 
-    drawMarkers() {
+    drawFretMarkerDouble(markerId, x, y) {
+        for (let i = 0; i < 2; i++) {
+            const adjustedY =
+                y -
+                this.persistence.consts.offsetX +
+                i * this.persistence.consts.offsetX * 2;
+            const marker = createSvgElement("g", {
+                id: markerId,
+                transform: "translate(" + x + "," + adjustedY + ")",
+                "data-x": x,
+                "data-y": adjustedY,
+            });
+            this.fretMarkers.appendChild(marker);
+            const circle1 = createSvgElement("circle", {
+                r: this.persistence.consts.circleRadius / 1.5,
+            });
+            marker.appendChild(circle1);
+        }
+    }
+
+    drawFretMarkerSingle(markerId, x, y) {
+        const marker = createSvgElement("g", {
+            id: markerId,
+            transform: "translate(" + x + "," + y + ")",
+            "data-x": x,
+            "data-y": y,
+        });
+        this.fretMarkers.appendChild(marker);
+        const circle = createSvgElement("circle", {
+            r: this.persistence.consts.circleRadius / 1.5,
+        });
+        marker.appendChild(circle);
+    }
+
+    drawFretMarkers() {
+        this.fretMarkers = createSvgElement("g", {
+            class: "fretMarkers",
+        });
+        this.svg.appendChild(this.fretMarkers);
+        for (let i = 0; i < this.persistence.consts.markers.length; i++) {
+            const relativeMarkerFretPosition =
+                this.persistence.consts.markers[i] -
+                this.persistence.state.startFret;
+            if (
+                relativeMarkerFretPosition > 0 &&
+                this.persistence.consts.markers[i] <=
+                    this.persistence.state.endFret
+            ) {
+                const j = this.persistence.consts.numStrings / 2 - 0.5;
+                const markerId = `fret-marker-${relativeMarkerFretPosition}`;
+                const x =
+                    this.persistence.consts.offsetX +
+                    this.persistence.consts.fretWidth / 2 +
+                    this.persistence.consts.fretWidth *
+                        (relativeMarkerFretPosition - 1);
+                const y =
+                    this.persistence.consts.offsetY +
+                    this.persistence.consts.stringSpacing * j;
+                if (
+                    this.persistence.consts.doubleMarkers.includes(
+                        this.persistence.consts.markers[i]
+                    )
+                ) {
+                    this.drawFretMarkerDouble(markerId, x, y);
+                } else {
+                    this.drawFretMarkerSingle(markerId, x, y);
+                }
+            }
+        }
+    }
+
+    drawNumericMarkers() {
         const markers = createSvgElement("g", {
             class: "markers",
         });
-        const filteredMarkers = this.consts.markers.filter(
-            (i) => i > this.state.startFret && i <= this.state.endFret
+        const filteredMarkers = this.persistence.consts.markers.filter(
+            (i) =>
+                i > this.persistence.state.startFret &&
+                i <= this.persistence.state.endFret
         );
         for (let i of filteredMarkers) {
             const marker = createSvgElement("text", {
                 class: "marker",
                 x:
-                    this.consts.offsetX +
-                    (i - 1 - this.state.startFret) * this.consts.fretWidth +
-                    this.consts.fretWidth / 2,
+                    this.persistence.consts.offsetX +
+                    (i - 1 - this.persistence.state.startFret) *
+                        this.persistence.consts.fretWidth +
+                    this.persistence.consts.fretWidth / 2,
                 y:
-                    this.consts.offsetY +
-                    this.consts.fretHeight +
-                    this.consts.stringSpacing,
+                    this.persistence.consts.offsetY +
+                    this.persistence.consts.fretHeight +
+                    this.persistence.consts.stringSpacing,
             });
             marker.innerHTML = i;
             markers.appendChild(marker);
@@ -268,19 +545,21 @@ class Fretboard {
             class: "strings",
         });
         this.svg.appendChild(this.strings);
-        for (let i = 0; i < this.consts.numStrings; i++) {
+        for (let i = 0; i < this.persistence.consts.numStrings; i++) {
             let path =
                 "M " +
-                this.consts.offsetX +
+                this.persistence.consts.offsetX +
                 " " +
-                (this.consts.offsetY + i * this.consts.stringSpacing) +
+                (this.persistence.consts.offsetY +
+                    i * this.persistence.consts.stringSpacing) +
                 " h " +
-                this.state.fretboardWidth;
+                this.persistence.state.fretboardWidth;
             const string = createSvgElement("path", {
                 class: "string",
                 d: path,
                 styles: {
-                    "stroke-width": this.consts.minStringSize * (i + 1),
+                    "stroke-width":
+                        this.persistence.consts.minStringSize * (i + 1),
                 },
             });
             this.strings.appendChild(string);
@@ -301,7 +580,7 @@ class Fretboard {
         );
 
         const circle = createSvgElement("circle", {
-            r: this.consts.circleRadius,
+            r: this.persistence.consts.circleRadius,
         });
         if (isOpen) {
             setAttributes(circle, {
@@ -325,46 +604,9 @@ class Fretboard {
                 : {
                       type: "note",
                       color: "white",
-                      visibility: this.state.visibility,
+                      visibility: this.persistence.state.visibility,
                   };
         this.updateNote(note, update);
-    }
-
-    drawSingleFretMarker(markerId, x, y) {
-        const marker = createSvgElement("g", {
-            id: markerId,
-            transform: "translate(" + x + "," + y + ")",
-            "data-x": x,
-            "data-y": y,
-        });
-        this.fretMarkers.appendChild(marker);
-        const circle = createSvgElement("circle", {
-            r: this.consts.circleRadius / 1.5,
-        });
-        marker.appendChild(circle);
-    }
-
-    drawDoubleFretMarker(markerId, x, y) {
-        for (let i = 0; i < 2; i++) {
-            const adjustedY =
-                y - this.consts.offsetX + i * this.consts.offsetX * 2;
-            const marker = createSvgElement("g", {
-                id: markerId,
-                transform: "translate(" + x + "," + adjustedY + ")",
-                "data-x": x,
-                "data-y": adjustedY,
-            });
-            this.fretMarkers.appendChild(marker);
-            const circle1 = createSvgElement("circle", {
-                r: this.consts.circleRadius / 1.5,
-            });
-            marker.appendChild(circle1);
-        }
-    }
-
-    computeNoteName(fret, string) {
-        const interval = this.consts.stringIntervals[string] + fret + 1;
-        return this.consts.notes[this.state.enharmonic][interval % 12];
     }
 
     drawNotes() {
@@ -374,109 +616,53 @@ class Fretboard {
         this.svg.appendChild(this.notes);
 
         // open notes (fret: -1)
-        for (let j = 0; j < this.consts.numStrings; j++) {
+        for (let j = 0; j < this.persistence.consts.numStrings; j++) {
             const noteId = `o-s${j}`;
-            const x = this.consts.offsetX / 2;
-            const y = this.consts.offsetY + this.consts.stringSpacing * j;
+            const x = this.persistence.consts.offsetX / 2;
+            const y =
+                this.persistence.consts.offsetY +
+                this.persistence.consts.stringSpacing * j;
             const noteName = this.computeNoteName(-1, j);
             this.drawNote(noteId, x, y, noteName, true);
         }
         // notes on fretboard
-        for (let i = this.state.startFret; i < this.state.endFret; i++) {
-            for (let j = 0; j < this.consts.numStrings; j++) {
+        for (
+            let i = this.persistence.state.startFret;
+            i < this.persistence.state.endFret;
+            i++
+        ) {
+            for (let j = 0; j < this.persistence.consts.numStrings; j++) {
                 const noteId = `f${i}-s${j}`;
                 const x =
-                    this.consts.offsetX +
-                    this.consts.fretWidth / 2 +
-                    this.consts.fretWidth * (i - this.state.startFret);
-                const y = this.consts.offsetY + this.consts.stringSpacing * j;
+                    this.persistence.consts.offsetX +
+                    this.persistence.consts.fretWidth / 2 +
+                    this.persistence.consts.fretWidth *
+                        (i - this.persistence.state.startFret);
+                const y =
+                    this.persistence.consts.offsetY +
+                    this.persistence.consts.stringSpacing * j;
                 const noteName = this.computeNoteName(i, j);
                 this.drawNote(noteId, x, y, noteName, false);
             }
         }
     }
 
-    drawFretMarkers() {
-        this.fretMarkers = createSvgElement("g", {
-            class: "fretMarkers",
-        });
-        this.svg.appendChild(this.fretMarkers);
-        for (let i = 0; i < this.consts.markers.length; i++) {
-            const relativeMarkerFretPosition =
-                this.consts.markers[i] - this.state.startFret;
-            if (
-                relativeMarkerFretPosition > 0 &&
-                this.consts.markers[i] <= this.state.endFret
-            ) {
-                const j = this.consts.numStrings / 2 - 0.5;
-                const markerId = `fret-marker-${relativeMarkerFretPosition}`;
-                const x =
-                    this.consts.offsetX +
-                    this.consts.fretWidth / 2 +
-                    this.consts.fretWidth * (relativeMarkerFretPosition - 1);
-                const y = this.consts.offsetY + this.consts.stringSpacing * j;
-                if (
-                    this.consts.doubleMarkers.includes(this.consts.markers[i])
-                ) {
-                    this.drawDoubleFretMarker(markerId, x, y);
-                } else {
-                    this.drawSingleFretMarker(markerId, x, y);
-                }
-            }
-        }
-    }
-
-    noteClickHandler(event) {
-        event.stopPropagation();
-        const note = event.currentTarget;
-        note.focus();
-        if (this.state.selected) {
-            this.updateNote(this.state.selected, {
-                visibility: "visible",
-            });
-        }
-        this.updateNote(note, {
-            visibility: "selected",
-        });
-        this.state.selected = note;
-
-        if (event.ctrlKey) {
-            this.editSelectedLabel();
-        }
-        this.urlSave();
-    }
-
-    noteDoubleClickHandler(event) {
-        event.stopPropagation();
-        const note = event.currentTarget;
-        if (this.state.selected) {
-            this.updateNote(this.state.selected, {
-                visibility: "visible",
-            });
-        }
-        this.updateNote(note, {
-            visibility: "selected",
-        });
-        this.state.selected = note;
-        this.editSelectedLabel();
-    }
-
     editSelectedLabel() {
-        const selected = this.state.selected;
+        const selected = this.persistence.state.selected;
         const x = selected.getAttribute("data-x");
         const y = selected.getAttribute("data-y");
         setAttributes(this.editableText, {
-            x: x - this.consts.circleRadius,
-            y: y - this.consts.circleRadius + 4,
-            height: 2 * this.consts.circleRadius,
-            width: 2 * this.consts.circleRadius,
+            x: x - this.persistence.consts.circleRadius,
+            y: y - this.persistence.consts.circleRadius + 4,
+            height: 2 * this.persistence.consts.circleRadius,
+            width: 2 * this.persistence.consts.circleRadius,
             class: "visible",
             styles: {
                 display: "block",
             },
         });
 
-        const selectedText = this.state.selected.lastChild;
+        const selectedText = this.persistence.state.selected.lastChild;
         setAttributes(selectedText, {
             styles: {
                 display: "none",
@@ -506,18 +692,18 @@ class Fretboard {
             }
         });
         div.addEventListener("blur", (event) => {
-            if (!this.state.selected) {
+            if (!this.persistence.state.selected) {
                 return;
             }
-            const selectedText = this.state.selected.lastChild;
+            const selectedText = this.persistence.state.selected.lastChild;
 
             var newText = this.editableText.children[0].innerText;
             // don't allow empty labels
             if (newText.trim()) {
-                this.updateNote(this.state.selected, {
+                this.updateNote(this.persistence.state.selected, {
                     noteText: newText,
                 });
-                this.urlSave();
+                this.persistence.save();
             }
 
             this.editableText.children[0].innerHTML = "";
@@ -536,6 +722,45 @@ class Fretboard {
         this.svg.appendChild(this.editableText);
     }
 
+    erase() {
+        this.svg.innerHTML = "";
+    }
+
+    noteClickHandler(event) {
+        event.stopPropagation();
+        const note = event.currentTarget;
+        note.focus();
+        if (this.persistence.state.selected) {
+            this.updateNote(this.persistence.state.selected, {
+                visibility: "visible",
+            });
+        }
+        this.updateNote(note, {
+            visibility: "selected",
+        });
+        this.persistence.state.selected = note;
+
+        if (event.ctrlKey) {
+            this.editSelectedLabel();
+        }
+        this.persistence.save();
+    }
+
+    noteDoubleClickHandler(event) {
+        event.stopPropagation();
+        const note = event.currentTarget;
+        if (this.persistence.state.selected) {
+            this.updateNote(this.persistence.state.selected, {
+                visibility: "visible",
+            });
+        }
+        this.updateNote(note, {
+            visibility: "selected",
+        });
+        this.persistence.state.selected = note;
+        this.editSelectedLabel();
+    }
+
     updateNote(elem, update) {
         if (!(elem.id in this.data)) {
             this.data[elem.id] = {};
@@ -551,118 +776,7 @@ class Fretboard {
         for (let [key, value] of Object.entries(update)) {
             noteData[key] = value;
         }
-        this.state.notes[elem.id] = noteData;
-    }
-
-    toggleVisibility() {
-        this.state.visibility =
-            this.state.visibility === "hidden" ? "transparent" : "hidden";
-        for (let note of this.notes.children) {
-            if (
-                note.className.baseVal.endsWith("visible") ||
-                note.className.baseVal.endsWith("selected")
-            ) {
-                continue;
-            }
-            this.updateNote(note, {
-                visibility: this.state.visibility,
-            });
-        }
-
-        for (let [_key, value] of Object.entries(this.data)) {
-            if (
-                value["visibility"] === "visible" ||
-                value["visibility"] === "selected"
-            ) {
-                continue;
-            }
-            value["visibility"] = this.state.visibility;
-        }
-    }
-
-    clearSelection() {
-        if (this.state.selected) {
-            this.updateNote(this.state.selected, {
-                visibility: "visible",
-            });
-            this.state.selected = null;
-        }
-    }
-
-    erase() {
-        this.clearSelection();
-        this.svg.innerHTML = "";
-    }
-
-    reset() {
-        this.data = {};
-        for (let note of this.notes.children) {
-            // reset text
-            const text = note.lastChild;
-            if (text) {
-                text.innerHTML = text.getAttribute("data-note");
-            }
-            this.updateNote(note, {
-                type: "note",
-                color: "white",
-                visibility: this.state.visibility,
-            });
-            this.state.selected = null;
-        }
-        const url = new URL(location.href);
-        url.searchParams.delete("state");
-        history.replaceState(null, "", url);
-    }
-
-    urlSave() {
-        const savedState = Object.assign({}, this.state);
-        savedState.selected = null;
-        for (let key in this.state.notes) {
-            if (this.state.notes.hasOwnProperty(key)) {
-                const value = this.state.notes[key];
-                // don't save selections
-                if (value.visibility === "selected") {
-                    value.visibility = "visible";
-                }
-                // don't save transparent notes
-                if (value.visibility === "transparent") {
-                    delete this.state.notes[key];
-                }
-            }
-        }
-
-        const param = btoa(JSON.stringify(savedState));
-        const url = new URL(location.href);
-        url.searchParams.set("state", param);
-        history.replaceState(null, "", url);
-    }
-
-    urlRestore() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const state = urlParams.get("state");
-        if (state) {
-            const savedState = JSON.parse(atob(state));
-            this.state = savedState;
-            for (let key in this.state.notes) {
-                if (this.state.notes.hasOwnProperty(key)) {
-                    const note = document.querySelector("#" + key);
-                    if (note) {
-                        this.updateNote(note, this.state.notes[key]);
-                    }
-                }
-            }
-            document.getElementById("enharmonic").innerHTML =
-                this.consts.sign[(this.state.enharmonic + 1) % 2];
-            this.setFretWindow({
-                start: this.state.startFret,
-                end: this.state.endFret,
-            });
-            document.getElementById("start-fret").value =
-                this.state.startFret + 1;
-            document.getElementById("end-fret").value = this.state.endFret;
-            this.erase();
-            this.draw();
-        }
+        this.persistence.state.notes[elem.id] = noteData;
     }
 }
 
@@ -671,20 +785,26 @@ class Fretboard {
 /* Initialize diagram */
 
 const svg = document.getElementById("fretboard");
-const endFret = document.getElementById("end-fret");
 
+const persistence = new Peristence();
 const fretboard = new Fretboard({
-    svg: svg,
-    endFret: endFret,
+    svg,
+    persistence,
 });
+const controls = new Controls({
+    fretboard,
+    persistence,
+});
+
+controls.updateControllers();
 
 /* Button for toggeling unselected notes */
-
-const togglebutton = document.getElementById("visibility");
-togglebutton.addEventListener("click", (event) => {
-    fretboard.toggleVisibility();
-    fretboard.urlSave();
-});
+controls.controllers.visibilityToggleControl.addEventListener(
+    "click",
+    (event) => {
+        controls.toggleVisibility();
+    }
+);
 
 /* Save SVG button */
 
@@ -692,7 +812,7 @@ var svgButton = document.getElementById("save-svg");
 const svgLink = document.getElementById("svg-link");
 
 svgButton.addEventListener("click", () => {
-    fretboard.clearSelection();
+    controls.clearSelection();
     const svgCopy = inlineCSS(svg);
     var svgData = svgCopy.outerHTML;
     var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
@@ -737,46 +857,39 @@ function inlineCSS(svg) {
 
 /* Reset button */
 
-const resetButton = document.getElementById("reset");
-resetButton.addEventListener("click", (event) => {
+controls.controllers.resetControl.addEventListener("click", (event) => {
     const doReset = window.confirm("Do you really want to reset your diagram?");
     if (doReset) {
-        fretboard.reset();
+        controls.resetDiagram();
     }
 });
 
 /* Fret window */
 
-const startFret = document.getElementById("start-fret");
-startFret.addEventListener("input", (event) => {
-    fretboard.setFretWindow({ start: event.target.value - 1 });
-    fretboard.urlSave();
+controls.controllers.fretStartControl.addEventListener("input", (event) => {
+    controls.updateFretWindow({ start: parseInt(event.target.value) - 1 });
 });
 
-endFret.addEventListener("input", (event) => {
-    fretboard.setFretWindow({ end: parseInt(event.target.value) });
-    fretboard.urlSave();
+controls.controllers.fretEndControl.addEventListener("input", (event) => {
+    controls.updateFretWindow({ end: parseInt(event.target.value) });
 });
 
 /* Color selector */
 
-const colorButtons = document.querySelectorAll("button.color");
-for (let button of colorButtons) {
+for (let button of controls.controllers.colourControls) {
     button.addEventListener("click", (event) => {
-        fretboard.updateColor(event);
-        fretboard.urlSave();
+        controls.updateColor(event);
     });
 }
 
-const deleteNoteButton = document.getElementById("delete-note");
-deleteNoteButton.addEventListener("click", () => {
-    fretboard.deleteNote();
-    fretboard.urlSave();
+/* Delete button */
+
+controls.controllers.deleteControl.addEventListener("click", () => {
+    controls.deleteNote();
 });
 
-const enharmonicToggle = document.getElementById("enharmonic");
-enharmonicToggle.addEventListener("click", () => {
-    const sign = fretboard.toggleEnharmonic();
-    enharmonicToggle.innerHTML = sign;
-    fretboard.urlSave();
+/* Enharmonic toggle */
+
+controls.controllers.enharmonicControl.addEventListener("click", () => {
+    controls.toggleEnharmonic();
 });

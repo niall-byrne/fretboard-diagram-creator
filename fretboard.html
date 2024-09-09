@@ -11,39 +11,51 @@
 </head>
 
 <body>
-    <figure id="fretboard-diagram-creator" class="half-full">
-        <svg xmlns="http://www.w3.org/2000/svg" id="fretboard" width=900 height=280 style="background-color: white;">
-        </svg>
-    </figure>
-    <div class="menu">
-        <div id="color-selector">
-            <button title="red" class="color red"></button>
-            <button title="orange" class="color orange"></button>
-            <button title="yellow" class="color yellow"></button>
-            <button title="brown" class="color brown"></button>
-            <button title="light_green" class="color light_green"></button>
-            <button title="green" class="color green"></button>
-            <button title="pink" class="color pink"></button>
-            <button title="purple" class="color purple"></button>
-            <button title="blue" class="color blue"></button>
-            <button title="teal" class="color teal"></button>
-            <button title="lime_green" class="color lime_green"></button>
-            <button title="black" class="color black"></button>
-            <button title="dark_gray" class="color dark_gray"></button>
-            <button title="gray" class="color gray"></button>
-            <button title="white" class="color white"></button>
-            <button title="delete" id="delete-note">X</button>
+    <div class="container">
+        <div class="global-actions">
+            <div class="fret-size-control">
+                <input id="fret-width-slider" type="range" class="num-input" value="60" name="fretWidth" min=45 max=70 step=1 style="width: 10ch">
+                <div id="fret-width-value" style="width: 2ch">15</div>
+            </div>
+            <div class="fret-size-control">
+                <input id="fret-height-slider" type="range" class="num-input" value="40" name="fretHeight" min=35 max=45 step=1 style="width: 10ch">
+                <div id="fret-height-value" style="width: 2ch">5</div>
+            </div>
         </div>
-        <div id="global-actions">
-            <input id="start-fret" type="number" class="num-input" value="1" name="startFret" min=1 max=22 maxlength="2"
-                style="width: 5ch" autocomplete=off>
-            <button id="enharmonic" style="width: 25px; text-align: center;">♭</button>
-            <button id="visibility" class="button">Toggle</button>
-            <button id="save-svg" class="button">Save</button>
-            <button id="reset" class="button">Reset</button>
-            <input id="end-fret" type="number" class="num-input" value="12" name="startFret" min=1 max=22 maxlength="2"
-                style="width: 5ch" autocomplete=off>
-            <a id="svg-link" download="fretboard-diagram.svg"></a>
+        <figure id="fretboard-diagram-creator" class="half-full">
+            <svg xmlns="http://www.w3.org/2000/svg" id="fretboard" width=900 height=280 style="background-color: white;">
+            </svg>
+        </figure>
+        <div class="menu">
+            <div id="color-selector">
+                <button title="red" class="color red"></button>
+                <button title="orange" class="color orange"></button>
+                <button title="yellow" class="color yellow"></button>
+                <button title="brown" class="color brown"></button>
+                <button title="light_green" class="color light_green"></button>
+                <button title="green" class="color green"></button>
+                <button title="pink" class="color pink"></button>
+                <button title="purple" class="color purple"></button>
+                <button title="blue" class="color blue"></button>
+                <button title="teal" class="color teal"></button>
+                <button title="lime_green" class="color lime_green"></button>
+                <button title="black" class="color black"></button>
+                <button title="dark_gray" class="color dark_gray"></button>
+                <button title="gray" class="color gray"></button>
+                <button title="white" class="color white"></button>
+                <button title="delete" id="delete-note">X</button>
+            </div>
+            <div class="global-actions">
+                <input id="start-fret" type="number" class="num-input" value="1" name="startFret" min=1 max=22 maxlength="2"
+                    style="width: 5ch" autocomplete=off>
+                <button id="enharmonic" style="width: 25px; text-align: center;">♭</button>
+                <button id="visibility" class="button">Toggle</button>
+                <button id="save-svg" class="button">Save</button>
+                <button id="reset" class="button">Reset</button>
+                <input id="end-fret" type="number" class="num-input" value="12" name="startFret" min=1 max=22 maxlength="2"
+                    style="width: 5ch" autocomplete=off>
+                <a id="svg-link" download="fretboard-diagram.svg"></a>
+            </div>
         </div>
     </div>
     <script src="fretboard.js"></script>

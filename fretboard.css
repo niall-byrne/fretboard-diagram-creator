@@ -318,7 +318,7 @@ button.color:hover {
 
 /* Global actions */
 
-#global-actions {
+.global-actions {
     margin: auto;
     width: 280px;
     display: flex;
@@ -357,6 +357,13 @@ button.color:hover {
             overflow-y: auto;
         }
     }
+}
+
+.fret-size-control {
+    display: flex;
+    align-items: space-between;
+    justify-content: space-between;
+    color: var(--gray_color)
 }
 
 .num-input {

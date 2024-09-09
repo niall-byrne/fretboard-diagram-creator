@@ -5,25 +5,15 @@ class Persistence {
         const fretWidthInput = document.getElementById("fret-width-slider");
         const fretHeightInput = document.getElementById("fret-height-slider");
 
-        this.consts = {
-            offsetX: 40,
-            offsetY: 30,
-            paddingY: 20,
-            stringIntervals: [24, 19, 15, 10, 5, 0],
-            markers: [3, 5, 7, 9, 12, 15, 17, 19, 21],
-            doubleMarkers: [12, 24],
-            minStringSize: 0.2,
-            maxStringSpacing: parseInt(fretHeightInput.getAttribute("max")),
-            minStringSpacing: parseInt(fretHeightInput.getAttribute("min")),
-            maxFretWidth: parseInt(fretWidthInput.getAttribute("max")),
-            minFretWidth: parseInt(fretWidthInput.getAttribute("min")),
-            circleRadius: 18,
-            //  prettier-ignore
-            notes: [['E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#'],
-                  ['E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B', 'C', 'Db', 'D', 'Eb']],
-            sign: ["♯", "♭"],
-        };
-
+        this.consts = fretboardConstants;
+        this.consts.maxStringSpacing = parseInt(
+            fretHeightInput.getAttribute("max")
+        );
+        this.consts.minStringSpacing = parseInt(
+            fretHeightInput.getAttribute("min")
+        );
+        this.consts.maxFretWidth = parseInt(fretWidthInput.getAttribute("max"));
+        this.consts.minFretWidth = parseInt(fretWidthInput.getAttribute("min"));
         this.consts.numStrings = this.consts.stringIntervals.length;
 
         this.initial = {
@@ -48,6 +38,28 @@ class Persistence {
         history.replaceState(null, "", url);
     }
 
+    decodeNote(encodedNote) {
+        const decodedNote = {
+            color: colorDecoder[encodedNote.c],
+            visibility: "visible",
+            type: "note",
+        };
+        if (encodedNote.noteText) {
+            decodedNote["noteText"] = encodedNote.noteText;
+        }
+        return decodedNote;
+    }
+
+    encodeNote(decodedNote) {
+        const encodedNote = {
+            c: colorEncoder[decodedNote.color],
+        };
+        if (decodedNote.noteText) {
+            encodedNote["noteText"] = decodedNote.noteText;
+        }
+        return encodedNote;
+    }
+
     reset() {
         this.state = Object.assign({}, this.initial);
 
@@ -64,17 +76,26 @@ class Persistence {
     restore(fretboard) {
         const urlParams = new URLSearchParams(window.location.search);
         const state = urlParams.get("state");
+
         if (state) {
-            const savedState = JSON.parse(atob(state));
-            this.state = savedState;
-            for (let key in this.state.notes) {
-                if (this.state.notes.hasOwnProperty(key)) {
-                    const note = document.querySelector("#" + key);
-                    if (note) {
-                        fretboard.updateNote(note, this.state.notes[key]);
-                    }
+            const restoredState = JSON.parse(atob(state));
+
+            for (const key in restoredState) {
+                if (key !== "encodedNotes") {
+                    this.state[key] = restoredState[key];
                 }
             }
+
+            for (const key in restoredState.encodedNotes) {
+                const note = document.querySelector("#" + key);
+                const attributes = this.decodeNote(
+                    restoredState.encodedNotes[key]
+                );
+                if (note) {
+                    fretboard.updateNote(note, attributes);
+                }
+            }
+
             fretboard.erase();
             fretboard.draw();
         }
@@ -83,21 +104,21 @@ class Persistence {
     save() {
         const savedState = Object.assign({}, this.state);
         savedState.selected = null;
+        delete savedState.notes;
+
+        const encodedNotes = {};
+
         for (let key in this.state.notes) {
-            if (this.state.notes.hasOwnProperty(key)) {
-                const value = this.state.notes[key];
-                // don't save selections
-                if (value.visibility === "selected") {
-                    value.visibility = "visible";
-                }
-                // don't save transparent notes
-                if (value.visibility === "transparent") {
-                    delete this.state.notes[key];
-                }
+            const value = this.state.notes[key];
+            if (["visible", "selected"].includes(value.visibility)) {
+                encodedNotes[key] = this.encodeNote(value);
             }
         }
 
+        savedState.encodedNotes = encodedNotes;
+
         const param = btoa(JSON.stringify(savedState));
+
         const url = new URL(location.href);
         url.searchParams.set("state", param);
         history.replaceState(null, "", url);

@@ -151,6 +151,7 @@ class Controls {
             fretEndControl: document.getElementById("end-fret"),
             fretStartControl: document.getElementById("start-fret"),
             resetControl: document.getElementById("reset"),
+            saveControl: document.getElementById("save-svg"),
             visibilityToggleControl: document.getElementById("visibility"),
         };
     }
@@ -790,6 +791,59 @@ class Fretboard {
     }
 }
 
+class Image {
+    constructor(opts) {
+        this.controls = opts.controls;
+        this.svg = svg;
+        this.svgProperties = [
+            "fill",
+            "stroke",
+            "stroke-width",
+            "text-anchor",
+            "dominant-baseline",
+        ];
+        this.svgLink = document.getElementById("svg-link");
+    }
+
+    download() {
+        controls.clearSelection();
+        const svgCopy = this.inlineCSS(svg);
+        const svgData = svgCopy.outerHTML;
+        const svgBlob = new Blob([svgData], {
+            type: "image/svg+xml;charset=utf-8",
+        });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        this.svgLink.href = svgUrl;
+        this.svgLink.click();
+    }
+
+    inlineCSS(svg) {
+        const svgElements = document.querySelectorAll("#fretboard *");
+        const clonedSVG = this.svg.cloneNode(true);
+        const clonedElements = clonedSVG.querySelectorAll("*");
+        for (let i = 0; i < svgElements.length; i++) {
+            const computedStyle = getComputedStyle(svgElements[i]);
+            // remove invisible elements to reduce file size
+            const opacity = computedStyle.getPropertyValue("opacity");
+            if (opacity === "0") {
+                clonedElements[i].remove();
+                continue;
+            }
+            const styles = { opacity: opacity };
+            for (let attr of this.svgProperties) {
+                let value = computedStyle.getPropertyValue(attr);
+                if (value) {
+                    styles[attr] = value;
+                }
+            }
+            setAttributes(clonedElements[i], {
+                styles: styles,
+            });
+        }
+        return clonedSVG;
+    }
+}
+
 /* Main */
 
 /* Initialize diagram */
@@ -805,57 +859,9 @@ const controls = new Controls({
     fretboard,
     persistence,
 });
+const image = new Image({ controls, svg });
 
 controls.updateControllers();
-
-/* Save SVG button */
-
-var svgButton = document.getElementById("save-svg");
-const svgLink = document.getElementById("svg-link");
-
-svgButton.addEventListener("click", () => {
-    controls.clearSelection();
-    const svgCopy = inlineCSS(svg);
-    var svgData = svgCopy.outerHTML;
-    var svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-    var svgUrl = URL.createObjectURL(svgBlob);
-    svgLink.href = svgUrl;
-    svgLink.click();
-});
-
-const PROPERTIES = [
-    "fill",
-    "stroke",
-    "stroke-width",
-    "text-anchor",
-    "dominant-baseline",
-];
-
-function inlineCSS(svg) {
-    const svgElements = document.querySelectorAll("#fretboard *");
-    const clonedSVG = svg.cloneNode((deep = true));
-    const clonedElements = clonedSVG.querySelectorAll("*");
-    for (let i = 0; i < svgElements.length; i++) {
-        const computedStyle = getComputedStyle(svgElements[i]);
-        // remove invisible elements to reduce file size
-        const opacity = computedStyle.getPropertyValue("opacity");
-        if (opacity === "0") {
-            clonedElements[i].remove();
-            continue;
-        }
-        const styles = { opacity: opacity };
-        for (let attr of PROPERTIES) {
-            let value = computedStyle.getPropertyValue(attr);
-            if (value) {
-                styles[attr] = value;
-            }
-        }
-        setAttributes(clonedElements[i], {
-            styles: styles,
-        });
-    }
-    return clonedSVG;
-}
 
 /* Register controls */
 
@@ -873,6 +879,9 @@ controls.controllers.enharmonicControl.addEventListener("click", () =>
 );
 controls.controllers.visibilityToggleControl.addEventListener("click", () =>
     controls.toggleVisibility()
+);
+controls.controllers.saveControl.addEventListener("click", () =>
+    image.download()
 );
 controls.controllers.resetControl.addEventListener("click", () =>
     controls.resetDiagram()

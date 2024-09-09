@@ -43,24 +43,21 @@ class Peristence {
     // Manages state and persistence of state
 
     constructor() {
-        this.initial = {
-            selected: null,
-            visibility: "transparent",
-            startFret: 0,
-            endFret: 12,
-            enharmonic: 0,
-            notes: {},
-        };
+        const fretWidthInput = document.getElementById("fret-width-slider");
+        const fretHeightInput = document.getElementById("fret-height-slider");
 
         this.consts = {
             offsetX: 40,
             offsetY: 30,
+            paddingY: 20,
             stringIntervals: [24, 19, 15, 10, 5, 0],
             markers: [3, 5, 7, 9, 12, 15, 17, 19, 21],
             doubleMarkers: [12, 24],
-            fretWidth: 70,
-            stringSpacing: 40,
             minStringSize: 0.2,
+            maxStringSpacing: parseInt(fretHeightInput.getAttribute("max")),
+            minStringSpacing: parseInt(fretHeightInput.getAttribute("min")),
+            maxFretWidth: parseInt(fretWidthInput.getAttribute("max")),
+            minFretWidth: parseInt(fretWidthInput.getAttribute("min")),
             circleRadius: 18,
             //  prettier-ignore
             notes: [['E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', 'C', 'C#', 'D', 'D#'],
@@ -69,8 +66,19 @@ class Peristence {
         };
 
         this.consts.numStrings = this.consts.stringIntervals.length;
-        this.consts.fretHeight =
-            (this.consts.numStrings - 1) * this.consts.stringSpacing;
+
+        this.initial = {
+            selected: null,
+            visibility: "transparent",
+            startFret: 0,
+            stringSpacing: parseInt(fretHeightInput.value),
+            endFret: 12,
+            enharmonic: 0,
+            fretHeight:
+                (this.consts.numStrings - 1) * parseInt(fretHeightInput.value),
+            fretWidth: parseInt(fretWidthInput.value),
+            notes: {},
+        };
 
         this.reset();
     }
@@ -88,7 +96,7 @@ class Peristence {
         this.state.endFret = Math.min(
             Math.floor(
                 (window.innerWidth - 2 * this.consts.offsetX) /
-                    this.consts.fretWidth
+                    this.initial.fretWidth
             ),
             12
         );
@@ -144,12 +152,19 @@ class Controls {
         this.persistence = opts.persistence;
         this.fretboard = opts.fretboard;
 
+        this.gauges = {
+            freightHeightGauge: document.getElementById("fret-height-value"),
+            freightWidthGauge: document.getElementById("fret-width-value"),
+        };
+
         this.controllers = {
             colourControls: document.querySelectorAll("button.color"),
             deleteControl: document.getElementById("delete-note"),
             enharmonicControl: document.getElementById("enharmonic"),
             fretEndControl: document.getElementById("end-fret"),
+            fretHeightControl: document.getElementById("fret-height-slider"),
             fretStartControl: document.getElementById("start-fret"),
+            fretWidthControl: document.getElementById("fret-width-slider"),
             resetControl: document.getElementById("reset"),
             saveControl: document.getElementById("save-svg"),
             visibilityToggleControl: document.getElementById("visibility"),
@@ -225,9 +240,10 @@ class Controls {
         }
 
         this.persistence.reset();
+        this.updateFretSize();
         this.updateFretWindow();
-        this.updateControllers();
         this.updateVisibillity();
+        this.updateControllers();
         this.persistence.clear();
     }
 
@@ -243,6 +259,10 @@ class Controls {
     }
 
     updateControllers() {
+        this.controllers.fretHeightControl.value =
+            this.persistence.state.stringSpacing;
+        this.controllers.fretWidthControl.value =
+            this.persistence.state.fretWidth;
         this.controllers.fretStartControl.value =
             this.persistence.state.startFret + 1;
         this.controllers.fretEndControl.value = this.persistence.state.endFret;
@@ -254,6 +274,60 @@ class Controls {
 
     updateEnharmonic() {
         this.fretboard.erase();
+        this.fretboard.draw();
+        this.persistence.save();
+    }
+
+    updateFretSize(fretSize) {
+        const height =
+            fretSize && "height" in fretSize
+                ? fretSize.height
+                : this.persistence.state.stringSpacing;
+        const width =
+            fretSize && "width" in fretSize
+                ? fretSize.width
+                : this.persistence.state.fretWidth;
+
+        this.fretboard.erase();
+
+        if (
+            height < this.persistence.consts.minStringSpacing ||
+            height > this.persistence.consts.maxStringSpacing
+        ) {
+            this.fretboard.drawError("Invalid fret height value!");
+            return;
+        }
+        if (
+            width < this.persistence.consts.minFretWidth ||
+            width > this.persistence.consts.maxFretWidth
+        ) {
+            this.fretboard.drawError("Invalid fret width value!");
+            return;
+        }
+
+        this.persistence.state.stringSpacing = height;
+        this.persistence.state.fretHeight =
+            (this.persistence.consts.numStrings - 1) *
+            this.persistence.state.stringSpacing;
+        this.persistence.state.fretWidth = width;
+
+        const svgHeight =
+            this.persistence.consts.offsetY * 2 +
+            this.persistence.state.fretHeight +
+            this.persistence.consts.paddingY;
+
+        // Resize SVG as needed
+        document
+            .getElementById("fretboard")
+            .setAttribute("height", `${svgHeight}px`);
+
+        // Update Controls
+        this.gauges.freightWidthGauge.innerText =
+            width - this.persistence.consts.minFretWidth;
+        this.gauges.freightHeightGauge.innerText =
+            height - this.persistence.consts.minStringSpacing;
+
+        this.fretboard.computeDependents();
         this.fretboard.draw();
         this.persistence.save();
     }
@@ -345,7 +419,7 @@ class Fretboard {
         this.persistence.state.numFrets =
             this.persistence.state.endFret - this.persistence.state.startFret;
         this.persistence.state.fretboardWidth =
-            this.persistence.consts.fretWidth * this.persistence.state.numFrets;
+            this.persistence.state.fretWidth * this.persistence.state.numFrets;
     }
 
     computeNoteName(fret, string) {
@@ -437,10 +511,10 @@ class Fretboard {
             let factor =
                 (i - this.persistence.state.startFret) % 2 == 0 ? 1 : -1;
             pathSegments.push(
-                "v " + factor * this.persistence.consts.fretHeight
+                "v " + factor * this.persistence.state.fretHeight
             );
             pathSegments.push(
-                "m " + this.persistence.consts.fretWidth + " " + 0
+                "m " + this.persistence.state.fretWidth + " " + 0
             );
         }
         const path = pathSegments.join(" ");
@@ -504,12 +578,12 @@ class Fretboard {
                 const markerId = `fret-marker-${relativeMarkerFretPosition}`;
                 const x =
                     this.persistence.consts.offsetX +
-                    this.persistence.consts.fretWidth / 2 +
-                    this.persistence.consts.fretWidth *
+                    this.persistence.state.fretWidth / 2 +
+                    this.persistence.state.fretWidth *
                         (relativeMarkerFretPosition - 1);
                 const y =
                     this.persistence.consts.offsetY +
-                    this.persistence.consts.stringSpacing * j;
+                    this.persistence.state.stringSpacing * j;
                 if (
                     this.persistence.consts.doubleMarkers.includes(
                         this.persistence.consts.markers[i]
@@ -538,12 +612,12 @@ class Fretboard {
                 x:
                     this.persistence.consts.offsetX +
                     (i - 1 - this.persistence.state.startFret) *
-                        this.persistence.consts.fretWidth +
-                    this.persistence.consts.fretWidth / 2,
+                        this.persistence.state.fretWidth +
+                    this.persistence.state.fretWidth / 2,
                 y:
                     this.persistence.consts.offsetY +
-                    this.persistence.consts.fretHeight +
-                    this.persistence.consts.stringSpacing,
+                    this.persistence.state.fretHeight +
+                    this.persistence.state.stringSpacing,
             });
             marker.innerHTML = i;
             markers.appendChild(marker);
@@ -562,7 +636,7 @@ class Fretboard {
                 this.persistence.consts.offsetX +
                 " " +
                 (this.persistence.consts.offsetY +
-                    i * this.persistence.consts.stringSpacing) +
+                    i * this.persistence.state.stringSpacing) +
                 " h " +
                 this.persistence.state.fretboardWidth;
             const string = createSvgElement("path", {
@@ -632,7 +706,7 @@ class Fretboard {
             const x = this.persistence.consts.offsetX / 2;
             const y =
                 this.persistence.consts.offsetY +
-                this.persistence.consts.stringSpacing * j;
+                this.persistence.state.stringSpacing * j;
             const noteName = this.computeNoteName(-1, j);
             this.drawNote(noteId, x, y, noteName, true);
         }
@@ -646,12 +720,12 @@ class Fretboard {
                 const noteId = `f${i}-s${j}`;
                 const x =
                     this.persistence.consts.offsetX +
-                    this.persistence.consts.fretWidth / 2 +
-                    this.persistence.consts.fretWidth *
+                    this.persistence.state.fretWidth / 2 +
+                    this.persistence.state.fretWidth *
                         (i - this.persistence.state.startFret);
                 const y =
                     this.persistence.consts.offsetY +
-                    this.persistence.consts.stringSpacing * j;
+                    this.persistence.state.stringSpacing * j;
                 const noteName = this.computeNoteName(i, j);
                 this.drawNote(noteId, x, y, noteName, false);
             }
@@ -893,3 +967,10 @@ controls.controllers.fretStartControl.addEventListener("input", (event) =>
 controls.controllers.fretEndControl.addEventListener("input", (event) =>
     controls.updateFretWindow({ end: parseInt(event.target.value) })
 );
+
+controls.controllers.fretWidthControl.addEventListener("input", (event) => {
+    controls.updateFretSize({ width: parseInt(event.target.value) });
+});
+controls.controllers.fretHeightControl.addEventListener("input", (event) => {
+    controls.updateFretSize({ height: parseInt(event.target.value) });
+});

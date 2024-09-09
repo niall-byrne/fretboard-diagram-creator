@@ -200,6 +200,15 @@ class Controls {
     }
 
     resetDiagram() {
+        const confirmed = window.confirm(
+            "Do you really want to reset your diagram?"
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        this.clearSelection();
+
         this.data = {};
         for (let note of fretboard.notes.children) {
             // reset text
@@ -213,11 +222,12 @@ class Controls {
                 visibility: this.persistence.state.visibility,
             });
         }
-        this.clearSelection();
-        this.persistence.clear();
+
         this.persistence.reset();
         this.updateFretWindow();
         this.updateControllers();
+        this.updateVisibillity();
+        this.persistence.clear();
     }
 
     updateColor(event) {
@@ -798,14 +808,6 @@ const controls = new Controls({
 
 controls.updateControllers();
 
-/* Button for toggeling unselected notes */
-controls.controllers.visibilityToggleControl.addEventListener(
-    "click",
-    (event) => {
-        controls.toggleVisibility();
-    }
-);
-
 /* Save SVG button */
 
 var svgButton = document.getElementById("save-svg");
@@ -855,41 +857,30 @@ function inlineCSS(svg) {
     return clonedSVG;
 }
 
-/* Reset button */
+/* Register controls */
 
-controls.controllers.resetControl.addEventListener("click", (event) => {
-    const doReset = window.confirm("Do you really want to reset your diagram?");
-    if (doReset) {
-        controls.resetDiagram();
-    }
-});
-
-/* Fret window */
-
-controls.controllers.fretStartControl.addEventListener("input", (event) => {
-    controls.updateFretWindow({ start: parseInt(event.target.value) - 1 });
-});
-
-controls.controllers.fretEndControl.addEventListener("input", (event) => {
-    controls.updateFretWindow({ end: parseInt(event.target.value) });
-});
-
-/* Color selector */
-
-for (let button of controls.controllers.colourControls) {
-    button.addEventListener("click", (event) => {
-        controls.updateColor(event);
-    });
+for (const colourButton of controls.controllers.colourControls) {
+    colourButton.addEventListener("click", (event) =>
+        controls.updateColor(event)
+    );
 }
+controls.controllers.deleteControl.addEventListener("click", () =>
+    controls.deleteNote()
+);
 
-/* Delete button */
+controls.controllers.enharmonicControl.addEventListener("click", () =>
+    controls.toggleEnharmonic()
+);
+controls.controllers.visibilityToggleControl.addEventListener("click", () =>
+    controls.toggleVisibility()
+);
+controls.controllers.resetControl.addEventListener("click", () =>
+    controls.resetDiagram()
+);
 
-controls.controllers.deleteControl.addEventListener("click", () => {
-    controls.deleteNote();
-});
-
-/* Enharmonic toggle */
-
-controls.controllers.enharmonicControl.addEventListener("click", () => {
-    controls.toggleEnharmonic();
-});
+controls.controllers.fretStartControl.addEventListener("input", (event) =>
+    controls.updateFretWindow({ start: parseInt(event.target.value) - 1 })
+);
+controls.controllers.fretEndControl.addEventListener("input", (event) =>
+    controls.updateFretWindow({ end: parseInt(event.target.value) })
+);
